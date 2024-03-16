@@ -44,8 +44,21 @@ export class InfraStack extends cdk.Stack {
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
           "CloudWatchFullAccess"
         ),
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonS3FullAccess"
+        ),
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonTextractFullAccess"
+        ),
       ],
     });
+
+    bucketRole.addToPolicy(
+      new cdk.aws_iam.PolicyStatement({
+        actions: ["textract:StartDocumentAnalysis"],
+        resources: ["*"],
+      })
+    );
 
     const processDocumentsFunction = new cdk.aws_lambda.Function(
       this,
