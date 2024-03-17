@@ -1,3 +1,5 @@
 go 1.22.1
 
 use ./process-documents
+
+use ./convert-files

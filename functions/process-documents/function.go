@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	runtime "github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -54,7 +55,13 @@ func retrieveDocumentsFomS3() {
 				S3Bucket: aws.String("med-manual-complete-bucket"),
 				S3Prefix: aws.String(document.Key + "-complete"),
 			},
-			FeatureTypes: []types.FeatureType{"TABLES", "FORMS"},
+			NotificationChannel: &types.NotificationChannel{
+				SNSTopicArn: aws.String(os.Getenv("SNS_TOPIC_ARN")),
+				RoleArn:     aws.String(os.Getenv("ROLE_ARN")),
+			},
+			FeatureTypes: []types.FeatureType{
+				types.FeatureTypeTables,
+			},
 		}
 
 		job, err := textractClient.StartDocumentAnalysis(context.TODO(), input)
