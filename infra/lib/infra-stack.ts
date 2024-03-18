@@ -35,7 +35,22 @@ export class InfraStack extends cdk.Stack {
       }
     );
 
-    const bucketRole = new cdk.aws_iam.Role(this, "BucketRole", {
+    // const extractedEnglishBucket = new cdk.aws_s3.Bucket(
+    //   this,
+    //   "ExtractedEnglishBucket",
+    //   {
+    //     removalPolicy: cdk.RemovalPolicy.DESTROY,
+    //     autoDeleteObjects: true,
+    //     lifecycleRules: [
+    //       {
+    //         expiration: cdk.Duration.days(30),
+    //       },
+    //     ],
+    //     bucketName: "med-manual-extracted-english-bucket",
+    //   }
+    // );
+
+    const functionRole = new cdk.aws_iam.Role(this, "BucketRole", {
       assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
@@ -53,7 +68,7 @@ export class InfraStack extends cdk.Stack {
       ],
     });
 
-    bucketRole.addToPolicy(
+    functionRole.addToPolicy(
       new cdk.aws_iam.PolicyStatement({
         actions: ["textract:StartDocumentAnalysis"],
         resources: ["*"],
@@ -68,12 +83,22 @@ export class InfraStack extends cdk.Stack {
       }
     );
 
-    bucketRole.addToPolicy(
+    functionRole.addToPolicy(
       new cdk.aws_iam.PolicyStatement({
         actions: ["sns:Publish"],
         resources: [completeNotificationQueue.topicArn],
       })
     );
+
+    // functionRole.addToPolicy(
+    //   new cdk.aws_iam.PolicyStatement({
+    //     actions: [
+    //       "comprehend:DetectDominantLanguage",
+    //       "comprehend:DetectEntities",
+    //     ],
+    //     resources: ["*"],
+    //   })
+    // );
 
     const snsRole = new cdk.aws_iam.Role(this, "SNSRole", {
       assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -96,7 +121,7 @@ export class InfraStack extends cdk.Stack {
       ],
     });
 
-    completeNotificationQueue.grantPublish(bucketRole);
+    completeNotificationQueue.grantPublish(functionRole);
 
     const processDocumentsFunction = new cdk.aws_lambda.Function(
       this,
@@ -112,7 +137,7 @@ export class InfraStack extends cdk.Stack {
           SNS_TOPIC_ARN: completeNotificationQueue.topicArn,
           ROLE_ARN: snsRole.roleArn,
         },
-        role: bucketRole,
+        role: functionRole,
       }
     );
 
@@ -127,12 +152,30 @@ export class InfraStack extends cdk.Stack {
         environment: {
           COMPLETE_BUCKET: processingCompleteBucket.bucketName,
         },
-        role: bucketRole,
+        role: functionRole,
       }
     );
+
+    // const extractEnglishLanguageFunction = new cdk.aws_lambda.Function(
+    //   this,
+    //   "ExtractEnglishLanguage",
+    //   {
+    //     runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
+    //     architecture: cdk.aws_lambda.Architecture.ARM_64,
+    //     handler: "bootstrap",
+    //     code: cdk.aws_lambda.Code.fromAsset("../out/lambda/extract-english"),
+    //     environment: {
+    //       SOURCE_BUCKET: processingCompleteBucket.bucketName,
+    //       TARGET_BUCKET: extractedEnglishBucket.bucketName,
+    //     },
+    //     role: functionRole,
+    //   }
+    // );
 
     documentUploadBucket.grantRead(processDocumentsFunction);
     processingCompleteBucket.grantWrite(processDocumentsFunction);
     processingCompleteBucket.grantReadWrite(createTextFileFunction);
+    // processingCompleteBucket.grantRead(extractEnglishLanguageFunction);
+    // extractedEnglishBucket.grantWrite(extractEnglishLanguageFunction);
   }
 }
