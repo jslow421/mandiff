@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	runtime "github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/textract"
 	"github.com/aws/aws-sdk-go-v2/service/textract/types"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/pemistahl/lingua-go"
 )
 
 func getRawText(ctx context.Context, client *textract.Client, jobID string) (string, error) {
@@ -24,9 +25,15 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 
 	for {
 		input := &textract.GetDocumentAnalysisInput{
-			JobId:     aws.String(jobID),
-			NextToken: aws.String(nextToken), // Pass NextToken if available
+			JobId: aws.String(jobID),
 		}
+
+		if nextToken != "" {
+			log.Println("Found a next token to use:", nextToken)
+			input.NextToken = &nextToken
+		}
+
+		log.Println("Job ID:", jobID)
 
 		result, err := client.GetDocumentAnalysis(ctx, input)
 		if err != nil {
@@ -35,14 +42,23 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 				log.Println("AWS error code:", awsErr.Code(), "message:", awsErr.Message())
 			} else {
 				// Handle other types of errors
-				log.Println(err.Error())
+				log.Println("Some other error:", err.Error())
 			}
 			return "", err
 		}
 
+		log.Println("Result status message:", result.StatusMessage)
+		log.Println("Result blocks:", len(result.Blocks))
+
 		for _, block := range result.Blocks {
 			if block.BlockType == "LINE" {
-				rawText += *block.Text + "\n" // Add newline if needed
+				// Detect language
+				value := *block.Text
+				isEnglish, _ := checkIsEnglish(value)
+				if isEnglish {
+					log.Println("Line is English:", value)
+					rawText += value + "\n"
+				}
 			}
 		}
 
@@ -93,7 +109,33 @@ func handleTextractCompletion(jobId string) error {
 	return nil
 }
 
-func handler() {
+func checkIsEnglish(line string) (bool, error) {
+	var output string
+	languages := []lingua.Language{
+		lingua.English,
+		lingua.French,
+		lingua.German,
+		lingua.Swedish,
+		lingua.Italian,
+		lingua.Spanish,
+	}
+
+	detector := lingua.NewLanguageDetectorBuilder().FromLanguages(languages...).Build()
+
+	if language, exists := detector.DetectLanguageOf(line); exists {
+		output = language.String()
+	}
+
+	isEnglish := output == "English"
+
+	return isEnglish, nil
+}
+
+type DocumentEvent struct {
+	JobId string `json:"jobId"`
+}
+
+func handler(ctx context.Context, event *DocumentEvent) {
 	fmt.Println("Processing documents...")
 
 	// Replace placeholders
@@ -118,11 +160,16 @@ func handler() {
 		os.Exit(1)
 	}
 
+	if rawText == "" {
+		fmt.Println("No raw text found")
+		os.Exit(1)
+	}
+
 	// Upload to S3
 	_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(outputKey),
-		Body:   io.NopCloser(strings.NewReader(rawText)), // io.NopCloser for minimal memory usage
+		Body:   io.NopCloser(strings.NewReader(rawText)),
 	})
 	if err != nil {
 		fmt.Println("Error uploading to S3:", err)
@@ -135,5 +182,5 @@ func handler() {
 
 func main() {
 	log.Println("Starting handler...")
-	runtime.Start(handler)
+	lambda.Start(handler)
 }

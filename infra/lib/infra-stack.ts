@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import { Timeout } from "aws-cdk-lib/aws-stepfunctions";
 import { Construct } from "constructs";
 
 export class InfraStack extends cdk.Stack {
@@ -138,6 +139,7 @@ export class InfraStack extends cdk.Stack {
           ROLE_ARN: snsRole.roleArn,
         },
         role: functionRole,
+        timeout: cdk.Duration.minutes(10),
       }
     );
 
@@ -147,12 +149,14 @@ export class InfraStack extends cdk.Stack {
       {
         runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
         architecture: cdk.aws_lambda.Architecture.ARM_64,
+        memorySize: 1024,
         handler: "bootstrap",
         code: cdk.aws_lambda.Code.fromAsset("../out/lambda/convert-files"),
         environment: {
           COMPLETE_BUCKET: processingCompleteBucket.bucketName,
         },
         role: functionRole,
+        timeout: cdk.Duration.minutes(10),
       }
     );
 

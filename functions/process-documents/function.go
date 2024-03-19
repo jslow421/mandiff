@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	runtime "github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -82,5 +82,5 @@ func handler() {
 
 func main() {
 	log.Println("Starting handler...")
-	runtime.Start(handler)
+	lambda.Start(handler)
 }
