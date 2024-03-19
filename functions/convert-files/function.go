@@ -17,7 +17,7 @@ import (
 	"github.com/pemistahl/lingua-go"
 )
 
-func getRawText(ctx context.Context, client *textract.Client, jobID string) (string, error) {
+func getRawText(ctx context.Context, client *textract.Client, jobID string, shouldFilterLanguage bool) (string, error) {
 	var rawText string
 	nextToken := ""
 
@@ -44,10 +44,16 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 			if block.BlockType == "LINE" {
 				// Detect language
 				value := *block.Text
-				isEnglish, _ := checkIsEnglish(value)
-				if isEnglish {
+
+				if shouldFilterLanguage {
+					isEnglish, _ := checkIsEnglish(value)
+					if isEnglish {
+						rawText += value + "\n"
+					}
+				} else {
 					rawText += value + "\n"
 				}
+
 			}
 		}
 
@@ -93,10 +99,11 @@ func checkIsEnglish(line string) (bool, error) {
 }
 
 type DocumentEvent struct {
-	JobId            string `json:"jobId"`
-	InputBucketName  string `json:"inputBucketName"`
-	OutputBucketName string `json:"outputBucketName"`
-	OutputFileName   string `json:"outputFileName"`
+	JobId                string `json:"jobId"`
+	InputBucketName      string `json:"inputBucketName"`
+	OutputBucketName     string `json:"outputBucketName"`
+	OutputFileName       string `json:"outputFileName"`
+	ShouldFilterLanguage bool   `json:"shouldFilterLanguage"`
 }
 
 func handler(ctx context.Context, event *DocumentEvent) (string, error) {
@@ -117,7 +124,7 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 	uploader := manager.NewUploader(s3Client)
 
 	// Get the raw text
-	rawText, err := getRawText(context.TODO(), textractClient, jobID)
+	rawText, err := getRawText(context.TODO(), textractClient, jobID, event.ShouldFilterLanguage)
 	if err != nil {
 		log.Println("Error getting raw text:", err)
 		os.Exit(1)
