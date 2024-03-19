@@ -80,6 +80,7 @@ func checkIsEnglish(line string) (bool, error) {
 		lingua.Danish,
 		lingua.Finnish,
 		lingua.Lithuanian,
+		lingua.Turkish,
 	}
 
 	detector := lingua.NewLanguageDetectorBuilder().FromLanguages(languages...).Build()
