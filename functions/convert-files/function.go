@@ -14,14 +14,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/textract"
-	"github.com/aws/aws-sdk-go-v2/service/textract/types"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/pemistahl/lingua-go"
 )
 
 func getRawText(ctx context.Context, client *textract.Client, jobID string) (string, error) {
 	var rawText string
-	nextToken := "" // Start with no token
+	nextToken := ""
 
 	for {
 		input := &textract.GetDocumentAnalysisInput{
@@ -29,11 +28,8 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 		}
 
 		if nextToken != "" {
-			log.Println("Found a next token to use:", nextToken)
 			input.NextToken = &nextToken
 		}
-
-		log.Println("Job ID:", jobID)
 
 		result, err := client.GetDocumentAnalysis(ctx, input)
 		if err != nil {
@@ -47,16 +43,12 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 			return "", err
 		}
 
-		log.Println("Result status message:", result.StatusMessage)
-		log.Println("Result blocks:", len(result.Blocks))
-
 		for _, block := range result.Blocks {
 			if block.BlockType == "LINE" {
 				// Detect language
 				value := *block.Text
 				isEnglish, _ := checkIsEnglish(value)
 				if isEnglish {
-					log.Println("Line is English:", value)
 					rawText += value + "\n"
 				}
 			}
@@ -72,45 +64,9 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 	return rawText, nil
 }
 
-func handleTextractCompletion(jobId string) error {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %v", err)
-	}
-
-	textractClient := textract.NewFromConfig(cfg)
-	s3Client := s3.NewFromConfig(cfg)
-
-	result, err := textractClient.GetDocumentAnalysis(context.TODO(), &textract.GetDocumentAnalysisInput{
-		JobId: aws.String(jobId),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get Textract results: %v", err)
-	}
-
-	var textBuilder strings.Builder
-	for _, block := range result.Blocks {
-		if block.BlockType == types.BlockTypeLine {
-			textBuilder.WriteString(*block.Text)
-			textBuilder.WriteString("\n")
-		}
-	}
-
-	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(os.Getenv("COMPLETE_BUCKET")),
-		Key:         aws.String(jobId + ".txt"), // Assuming JobId is unique
-		Body:        strings.NewReader(textBuilder.String()),
-		ContentType: aws.String("text/plain"),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to upload text file to S3: %v", err)
-	}
-
-	return nil
-}
-
 func checkIsEnglish(line string) (bool, error) {
 	var output string
+	var confidence float64
 	languages := []lingua.Language{
 		lingua.English,
 		lingua.French,
@@ -118,35 +74,45 @@ func checkIsEnglish(line string) (bool, error) {
 		lingua.Swedish,
 		lingua.Italian,
 		lingua.Spanish,
+		lingua.Portuguese,
+		lingua.Polish,
+		lingua.Dutch,
+		lingua.Danish,
+		lingua.Finnish,
+		lingua.Lithuanian,
 	}
 
 	detector := lingua.NewLanguageDetectorBuilder().FromLanguages(languages...).Build()
 
 	if language, exists := detector.DetectLanguageOf(line); exists {
 		output = language.String()
+		confidence = detector.ComputeLanguageConfidence(output, language)
 	}
 
-	isEnglish := output == "English"
+	isEnglish := (output == "English" && confidence >= 0.2)
 
 	return isEnglish, nil
 }
 
 type DocumentEvent struct {
-	JobId string `json:"jobId"`
+	JobId            string `json:"jobId"`
+	InputBucketName  string `json:"inputBucketName"`
+	OutputBucketName string `json:"outputBucketName"`
+	OutputFileName   string `json:"outputFileName"`
 }
 
-func handler(ctx context.Context, event *DocumentEvent) {
-	fmt.Println("Processing documents...")
-
+func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 	// Replace placeholders
-	jobID := "c7350199d357f286facbe43b29fdfd9acce301ee25f51d865836fd4d4deee8b2"
+	jobID := event.JobId
 	bucketName := os.Getenv("COMPLETE_BUCKET")
 	outputKey := "output.txt"
+
+	log.Println("Processing documents with job ID:", jobID)
 
 	// Load AWS credentials and create clients
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
-		fmt.Println("Error loading AWS config:", err)
+		log.Println("Error loading AWS config:", err)
 		os.Exit(1)
 	}
 	textractClient := textract.NewFromConfig(cfg)
@@ -156,12 +122,12 @@ func handler(ctx context.Context, event *DocumentEvent) {
 	// Get the raw text
 	rawText, err := getRawText(context.TODO(), textractClient, jobID)
 	if err != nil {
-		fmt.Println("Error getting raw text:", err)
+		log.Println("Error getting raw text:", err)
 		os.Exit(1)
 	}
 
 	if rawText == "" {
-		fmt.Println("No raw text found")
+		log.Println("No raw text found - this seems unlikely. Perhaps there are no English lines in the document?")
 		os.Exit(1)
 	}
 
@@ -176,8 +142,8 @@ func handler(ctx context.Context, event *DocumentEvent) {
 		os.Exit(1)
 	}
 
-	fmt.Println("Raw text stored in S3:", bucketName, "/", outputKey)
-
+	log.Println("Raw text stored in S3:", bucketName, "/", outputKey)
+	return "Success", nil
 }
 
 func main() {
