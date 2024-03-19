@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -24,7 +23,7 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 
 	for {
 		input := &textract.GetDocumentAnalysisInput{
-			JobId: aws.String(jobID),
+			JobId: &jobID,
 		}
 
 		if nextToken != "" {
@@ -34,10 +33,8 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 		result, err := client.GetDocumentAnalysis(ctx, input)
 		if err != nil {
 			if awsErr, ok := err.(awserr.Error); ok {
-				// Print detailed error information
 				log.Println("AWS error code:", awsErr.Code(), "message:", awsErr.Message())
 			} else {
-				// Handle other types of errors
 				log.Println("Some other error:", err.Error())
 			}
 			return "", err
@@ -54,10 +51,10 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 			}
 		}
 
-		// Check for pagination
-		nextToken = aws.ToString(result.NextToken)
+		nextToken = *result.NextToken
+
 		if nextToken == "" {
-			break // No more pages
+			break
 		}
 	}
 
@@ -134,8 +131,8 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 
 	// Upload to S3
 	_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
-		Bucket: aws.String(bucketName),
-		Key:    aws.String(outputKey),
+		Bucket: &bucketName,
+		Key:    &outputKey,
 		Body:   io.NopCloser(strings.NewReader(rawText)),
 	})
 	if err != nil {

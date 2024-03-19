@@ -1,5 +1,4 @@
 import * as cdk from "aws-cdk-lib";
-import { Timeout } from "aws-cdk-lib/aws-stepfunctions";
 import { Construct } from "constructs";
 
 export class InfraStack extends cdk.Stack {
@@ -35,8 +34,6 @@ export class InfraStack extends cdk.Stack {
         bucketName: "med-manual-complete-bucket",
       }
     );
-
-    // const extractedEnglishBucket = new cdk.aws_s3.Bucket(
     //   this,
     //   "ExtractedEnglishBucket",
     //   {
@@ -90,8 +87,6 @@ export class InfraStack extends cdk.Stack {
         resources: [completeNotificationQueue.topicArn],
       })
     );
-
-    // functionRole.addToPolicy(
     //   new cdk.aws_iam.PolicyStatement({
     //     actions: [
     //       "comprehend:DetectDominantLanguage",
@@ -118,6 +113,24 @@ export class InfraStack extends cdk.Stack {
         ),
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
           "AmazonSNSFullAccess"
+        ),
+      ],
+    });
+
+    const bedrockLambdaRole = new cdk.aws_iam.Role(this, "BedrockLambdaRole", {
+      assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AWSLambdaBasicExecutionRole"
+        ),
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "CloudWatchFullAccess"
+        ),
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonS3FullAccess"
+        ),
+        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonBedrockFullAccess"
         ),
       ],
     });
@@ -160,7 +173,18 @@ export class InfraStack extends cdk.Stack {
       }
     );
 
-    // const extractEnglishLanguageFunction = new cdk.aws_lambda.Function(
+    const llmFunction = new cdk.aws_lambda.Function(this, "LlmFunction", {
+      runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
+      architecture: cdk.aws_lambda.Architecture.ARM_64,
+      memorySize: 1024,
+      handler: "bootstrap",
+      code: cdk.aws_lambda.Code.fromAsset("../out/lambda/llm"),
+      environment: {
+        COMPLETE_BUCKET: processingCompleteBucket.bucketName,
+      },
+      role: functionRole,
+      timeout: cdk.Duration.minutes(3),
+    });
     //   this,
     //   "ExtractEnglishLanguage",
     //   {
@@ -179,7 +203,6 @@ export class InfraStack extends cdk.Stack {
     documentUploadBucket.grantRead(processDocumentsFunction);
     processingCompleteBucket.grantWrite(processDocumentsFunction);
     processingCompleteBucket.grantReadWrite(createTextFileFunction);
-    // processingCompleteBucket.grantRead(extractEnglishLanguageFunction);
-    // extractedEnglishBucket.grantWrite(extractEnglishLanguageFunction);
+    processingCompleteBucket.grantReadWrite(llmFunction);
   }
 }
