@@ -23,8 +23,9 @@ type Document struct {
 	Key    string `json:"key"`
 }
 
-func retrieveDocumentsFomS3(event DocumentEvent) {
+func retrieveDocumentsFomS3(event DocumentEvent) ([]string, error) {
 	log.Println("Retrieving documents from S3...")
+	var runningJobIds []string
 
 	cfg, _ := config.LoadDefaultConfig(context.TODO())
 
@@ -46,7 +47,7 @@ func retrieveDocumentsFomS3(event DocumentEvent) {
 
 	if len(bucketObjects.Contents) > 3 {
 		log.Fatalf("Too many documents in bucket: %d", len(bucketObjects.Contents))
-		return
+		return nil, fmt.Errorf("Too many documents in bucket: %d", len(bucketObjects.Contents))
 	}
 
 	for _, obj := range bucketObjects.Contents {
@@ -57,7 +58,7 @@ func retrieveDocumentsFomS3(event DocumentEvent) {
 		log.Printf("Processing document: %s", *document.Key)
 
 		if !strings.Contains(*document.Key, ".") {
-			log.Println("Skipping 'folder' key: ", *document.Key)
+			continue
 		}
 
 		objKey := *bucketObjects.Contents[i].Key
@@ -94,7 +95,10 @@ func retrieveDocumentsFomS3(event DocumentEvent) {
 		}
 
 		log.Printf("Started processing document %s with job id: %s", *document.Key, *job.JobId)
+		runningJobIds = append(runningJobIds, *job.JobId)
 	}
+
+	return runningJobIds, nil
 }
 
 type DocumentEvent struct {
@@ -105,10 +109,11 @@ type DocumentEvent struct {
 	ObjectPrefix     string `json:"objectPrefix"`
 }
 
-func handler(ctx context.Context, event *DocumentEvent) {
+func handler(ctx context.Context, event *DocumentEvent) ([]string, error) {
 	fmt.Println("Processing documents...")
-	retrieveDocumentsFomS3(*event)
+	jobIds, _ := retrieveDocumentsFomS3(*event)
 	log.Println("Documents sent for processing")
+	return jobIds, nil
 }
 
 func main() {
