@@ -51,10 +51,10 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string) (str
 			}
 		}
 
-		nextToken = *result.NextToken
-
 		if nextToken == "" {
 			break
+		} else {
+			nextToken = *result.NextToken
 		}
 	}
 
@@ -103,7 +103,6 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 	// Replace placeholders
 	jobID := event.JobId
 	bucketName := os.Getenv("COMPLETE_BUCKET")
-	outputKey := "output.txt"
 
 	log.Println("Processing documents with job ID:", jobID)
 
@@ -130,9 +129,10 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 	}
 
 	// Upload to S3
+	fileName := event.OutputFileName + ".txt"
 	_, err = uploader.Upload(context.TODO(), &s3.PutObjectInput{
 		Bucket: &bucketName,
-		Key:    &outputKey,
+		Key:    &fileName,
 		Body:   io.NopCloser(strings.NewReader(rawText)),
 	})
 	if err != nil {
@@ -140,7 +140,7 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 		os.Exit(1)
 	}
 
-	log.Println("Raw text stored in S3:", bucketName, "/", outputKey)
+	log.Println("Raw text stored in S3:", bucketName, "/", event.OutputFileName)
 	return "Success", nil
 }
 
