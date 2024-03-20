@@ -76,7 +76,6 @@ Assistant:
 `
 
 func buildPrompt(document1 string, document2 string) (string, error) {
-	//prompt := fmt.Sprintf(DEFAULT_PROMPT_TEMPLATE, "no history", "What is the best way to prompt an llm?")
 	template, err := template.New("prompt").Parse(DEFAULT_PROMPT_TEMPLATE)
 	if err != nil {
 		log.Fatalf("Failed to parse template: %v", err)
@@ -133,8 +132,8 @@ func getTextFromS3File(ctx context.Context, bucket string, key string) string {
 }
 
 func handler(ctx context.Context, event *LlmEvent) (string, error) {
-	var document1Text string
-	var document2Text string
+	var firstDocumentText string
+	var SecondDocumentText string
 	bucket := event.DocumentBucket
 	llm, err := bedrock.New(
 		bedrock.WithModel("anthropic.claude-3-sonnet-20240229-v1:0"),
@@ -142,6 +141,7 @@ func handler(ctx context.Context, event *LlmEvent) (string, error) {
 
 	if err != nil {
 		log.Fatalf("Failed to create LLM: %v", err)
+		return "", err
 	}
 
 	var wg = sync.WaitGroup{}
@@ -149,17 +149,17 @@ func handler(ctx context.Context, event *LlmEvent) (string, error) {
 
 	go func() {
 		defer wg.Done()
-		document1Text = getTextFromS3File(ctx, bucket, "document1.txt")
+		firstDocumentText = getTextFromS3File(ctx, bucket, "document1.txt")
 	}()
 
 	go func() {
 		defer wg.Done()
-		document2Text = getTextFromS3File(ctx, bucket, "document2.txt")
+		SecondDocumentText = getTextFromS3File(ctx, bucket, "document2.txt")
 	}()
 
 	wg.Wait()
 
-	prompt, _ := buildPrompt(document1Text, document2Text)
+	prompt, _ := buildPrompt(firstDocumentText, SecondDocumentText)
 
 	completion, err := llms.GenerateFromSinglePrompt(ctx, llm, prompt,
 		llms.WithMaxTokens(30000),
@@ -168,9 +168,9 @@ func handler(ctx context.Context, event *LlmEvent) (string, error) {
 
 	if err != nil {
 		log.Fatalf("Failed to generate completion: %v", err)
+		return "", err
 	}
 
-	log.Println("Returning: ", completion)
 	return completion, nil
 }
 

@@ -54,24 +54,29 @@ export class InfraStack extends cdk.Stack {
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
           "service-role/AWSLambdaBasicExecutionRole"
         ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "CloudWatchFullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonS3FullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonTextractFullAccess"
-        ),
       ],
+      inlinePolicies: {
+        bucket: new cdk.aws_iam.PolicyDocument({
+          statements: [
+            new cdk.aws_iam.PolicyStatement({
+              actions: ["s3:GetObject", "s3:PutObject", "s3:ListObjectsV2"],
+              resources: [
+                documentUploadBucket.bucketArn,
+                processingCompleteBucket.bucketArn,
+              ],
+            }),
+          ],
+        }),
+        textract: new cdk.aws_iam.PolicyDocument({
+          statements: [
+            new cdk.aws_iam.PolicyStatement({
+              actions: ["textract:StartDocumentAnalysis"],
+              resources: ["*"],
+            }),
+          ],
+        }),
+      },
     });
-
-    functionRole.addToPolicy(
-      new cdk.aws_iam.PolicyStatement({
-        actions: ["textract:StartDocumentAnalysis"],
-        resources: ["*"],
-      })
-    );
 
     const completeNotificationQueue = new cdk.aws_sns.Topic(
       this,
@@ -100,19 +105,7 @@ export class InfraStack extends cdk.Stack {
       assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "CloudWatchFullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonS3FullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonTextractFullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonSQSFullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonSNSFullAccess"
+          "service-role/AWSLambdaBasicExecutionRole"
         ),
       ],
     });
@@ -123,16 +116,21 @@ export class InfraStack extends cdk.Stack {
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
           "service-role/AWSLambdaBasicExecutionRole"
         ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "CloudWatchFullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonS3FullAccess"
-        ),
-        cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "AmazonBedrockFullAccess"
-        ),
       ],
+      inlinePolicies: {
+        bedrock: new cdk.aws_iam.PolicyDocument({
+          statements: [
+            new cdk.aws_iam.PolicyStatement({
+              actions: ["bedrock:invokeModel"],
+              resources: ["*"],
+            }),
+            new cdk.aws_iam.PolicyStatement({
+              actions: ["s3:GetObject", "s3:listObjectsV2"],
+              resources: [processingCompleteBucket.bucketArn],
+            }),
+          ],
+        }),
+      },
     });
 
     completeNotificationQueue.grantPublish(functionRole);
@@ -152,7 +150,7 @@ export class InfraStack extends cdk.Stack {
           ROLE_ARN: snsRole.roleArn,
         },
         role: functionRole,
-        timeout: cdk.Duration.minutes(10),
+        timeout: cdk.Duration.minutes(2),
       }
     );
 
