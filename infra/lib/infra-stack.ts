@@ -34,19 +34,6 @@ export class InfraStack extends cdk.Stack {
         bucketName: "med-manual-complete-bucket",
       }
     );
-    //   this,
-    //   "ExtractedEnglishBucket",
-    //   {
-    //     removalPolicy: cdk.RemovalPolicy.DESTROY,
-    //     autoDeleteObjects: true,
-    //     lifecycleRules: [
-    //       {
-    //         expiration: cdk.Duration.days(30),
-    //       },
-    //     ],
-    //     bucketName: "med-manual-extracted-english-bucket",
-    //   }
-    // );
 
     const functionRole = new cdk.aws_iam.Role(this, "BucketRole", {
       assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -89,21 +76,6 @@ export class InfraStack extends cdk.Stack {
       }
     );
 
-    // functionRole.addToPolicy(
-    //   new cdk.aws_iam.PolicyStatement({
-    //     actions: ["sns:Publish"],
-    //     resources: [completeNotificationQueue.topicArn],
-    //   })
-    // );
-    //   new cdk.aws_iam.PolicyStatement({
-    //     actions: [
-    //       "comprehend:DetectDominantLanguage",
-    //       "comprehend:DetectEntities",
-    //     ],
-    //     resources: ["*"],
-    //   })
-    // );
-
     const snsRole = new cdk.aws_iam.Role(this, "SNSRole", {
       assumedBy: new cdk.aws_iam.ServicePrincipal("textract.amazonaws.com"),
       managedPolicies: [
@@ -136,7 +108,6 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
-    completeNotificationQueue.grantPublish(functionRole);
     completeNotificationQueue.grantPublish(snsRole);
 
     const processDocumentsFunction = new cdk.aws_lambda.Function(

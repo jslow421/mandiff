@@ -5,12 +5,8 @@ import (
 )
 
 func TestBuildPrompt(test *testing.T) {
-	prompt := buildPrompt()
-	if len(prompt) < 20 {
+	prompt, err := buildPrompt("document1.txt", "document2.txt")
+	if len(prompt) < 20 || err != nil {
 		test.Errorf("Prompt is likely too short: %s", prompt)
 	}
-}
-
-func TestRunRequest(test *testing.T) {
-	runRequest()
 }
