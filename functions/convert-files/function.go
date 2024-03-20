@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/textract"
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go-v2/service/textract/types"
 	"github.com/pemistahl/lingua-go"
 )
 
@@ -31,29 +31,13 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string, shou
 
 		result, err := client.GetDocumentAnalysis(ctx, input)
 		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				log.Println("AWS error code:", awsErr.Code(), "message:", awsErr.Message())
-			} else {
-				log.Println("Some other error:", err.Error())
-			}
+			log.Fatal("Error getting document analysis:", err.Error())
 			return "", err
 		}
 
 		for _, block := range result.Blocks {
-			if block.BlockType == "LINE" {
-				// Detect language
-				value := *block.Text
-
-				if shouldFilterLanguage {
-					isEnglish, _ := checkIsEnglish(value)
-					if isEnglish {
-						rawText += value + "\n"
-					}
-				} else {
-					rawText += value + "\n"
-				}
-
-			}
+			rawTextValue := getRawTextValue(block, shouldFilterLanguage)
+			rawText += rawTextValue + "\n"
 		}
 
 		if nextToken == "" {
@@ -66,7 +50,25 @@ func getRawText(ctx context.Context, client *textract.Client, jobID string, shou
 	return rawText, nil
 }
 
-func checkIsEnglish(line string) (bool, error) {
+func getRawTextValue(block types.Block, shouldFilterLanguage bool) string {
+	var rawText string
+	if block.BlockType == "LINE" {
+		value := *block.Text
+
+		if shouldFilterLanguage {
+			isEnglish := checkIfTextIsLikelyEnglish(value)
+			if isEnglish {
+				rawText += value + "\n"
+			}
+		} else {
+			rawText += value + "\n"
+		}
+	}
+
+	return rawText
+}
+
+func checkIfTextIsLikelyEnglish(line string) bool {
 	var output string
 	var confidence float64
 	languages := []lingua.Language{
@@ -94,7 +96,7 @@ func checkIsEnglish(line string) (bool, error) {
 
 	isEnglish := (output == "English" && confidence >= 0.2)
 
-	return isEnglish, nil
+	return isEnglish
 }
 
 type DocumentEvent struct {
