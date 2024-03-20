@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -107,13 +106,11 @@ type DocumentEvent struct {
 }
 
 func handler(ctx context.Context, event *DocumentEvent) (string, error) {
-	// Replace placeholders
 	jobID := event.JobId
 	bucketName := os.Getenv("COMPLETE_BUCKET")
 
 	log.Println("Processing documents with job ID:", jobID)
 
-	// Load AWS credentials and create clients
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.Println("Error loading AWS config:", err)
@@ -123,7 +120,6 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 	s3Client := s3.NewFromConfig(cfg)
 	uploader := manager.NewUploader(s3Client)
 
-	// Get the raw text
 	rawText, err := getRawText(context.TODO(), textractClient, jobID, event.ShouldFilterLanguage)
 	if err != nil {
 		log.Println("Error getting raw text:", err)
@@ -143,7 +139,7 @@ func handler(ctx context.Context, event *DocumentEvent) (string, error) {
 		Body:   io.NopCloser(strings.NewReader(rawText)),
 	})
 	if err != nil {
-		fmt.Println("Error uploading to S3:", err)
+		log.Println("Error uploading to S3:", err)
 		os.Exit(1)
 	}
 

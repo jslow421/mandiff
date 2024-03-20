@@ -182,7 +182,7 @@ export class InfraStack extends cdk.Stack {
       environment: {
         COMPLETE_BUCKET: processingCompleteBucket.bucketName,
       },
-      role: functionRole,
+      role: bedrockLambdaRole,
       timeout: cdk.Duration.minutes(3),
     });
     //   this,
