@@ -70,7 +70,10 @@ export class InfraStack extends cdk.Stack {
         textract: new cdk.aws_iam.PolicyDocument({
           statements: [
             new cdk.aws_iam.PolicyStatement({
-              actions: ["textract:StartDocumentAnalysis"],
+              actions: [
+                "textract:StartDocumentAnalysis",
+                "textract:GetDocumentAnalysis",
+              ],
               resources: ["*"],
             }),
           ],
@@ -86,12 +89,12 @@ export class InfraStack extends cdk.Stack {
       }
     );
 
-    functionRole.addToPolicy(
-      new cdk.aws_iam.PolicyStatement({
-        actions: ["sns:Publish"],
-        resources: [completeNotificationQueue.topicArn],
-      })
-    );
+    // functionRole.addToPolicy(
+    //   new cdk.aws_iam.PolicyStatement({
+    //     actions: ["sns:Publish"],
+    //     resources: [completeNotificationQueue.topicArn],
+    //   })
+    // );
     //   new cdk.aws_iam.PolicyStatement({
     //     actions: [
     //       "comprehend:DetectDominantLanguage",
@@ -102,7 +105,7 @@ export class InfraStack extends cdk.Stack {
     // );
 
     const snsRole = new cdk.aws_iam.Role(this, "SNSRole", {
-      assumedBy: new cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com"),
+      assumedBy: new cdk.aws_iam.ServicePrincipal("textract.amazonaws.com"),
       managedPolicies: [
         cdk.aws_iam.ManagedPolicy.fromAwsManagedPolicyName(
           "service-role/AWSLambdaBasicExecutionRole"
@@ -134,6 +137,7 @@ export class InfraStack extends cdk.Stack {
     });
 
     completeNotificationQueue.grantPublish(functionRole);
+    completeNotificationQueue.grantPublish(snsRole);
 
     const processDocumentsFunction = new cdk.aws_lambda.Function(
       this,
