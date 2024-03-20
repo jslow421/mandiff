@@ -176,7 +176,7 @@ export class InfraStack extends cdk.Stack {
     const llmFunction = new cdk.aws_lambda.Function(this, "LlmFunction", {
       runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
       architecture: cdk.aws_lambda.Architecture.ARM_64,
-      memorySize: 1024,
+      memorySize: 512,
       handler: "bootstrap",
       code: cdk.aws_lambda.Code.fromAsset("../out/lambda/llm"),
       environment: {
