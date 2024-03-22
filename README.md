@@ -32,5 +32,5 @@ aws lambda invoke --function-name SlowikDocumentStack-CreateTextFileD8BBA755-6IR
 - run LLM function
 
 ```bash
-aws lambda invoke --function-name SlowikDocumentStack-LlmFunction49CBF322-BYpffuwiGVR5 --payload '{"documentBucket":"med-manual-complete-bucket"}' --cli-binary-format raw-in-base64-out /dev/stdout
+aws lambda invoke --function-name SlowikDocumentStack-LlmFunction49CBF322-BYpffuwiGVR5 --payload '{"documentBucket":"med-manual-complete-bucket", "document1Key": "document1.txt", "document2Key": "document2.txt"}' --cli-binary-format raw-in-base64-out /dev/stdout
 ```

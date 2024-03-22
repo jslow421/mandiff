@@ -20,6 +20,8 @@ type LlmEvent struct {
 	InitialDocument string `json:"initialDocument"`
 	UpdatedDocument string `json:"updatedDocument"`
 	DocumentBucket  string `json:"documentBucket"`
+	Document1Key    string `json:"document1Key"`
+	Document2Key    string `json:"document2Key"`
 }
 
 const MAX_HISTORY_LENGTH = 10
@@ -149,12 +151,12 @@ func handler(ctx context.Context, event *LlmEvent) (string, error) {
 
 	go func() {
 		defer wg.Done()
-		firstDocumentText = getTextFromS3File(ctx, bucket, "document1.txt")
+		firstDocumentText = getTextFromS3File(ctx, bucket, event.Document1Key)
 	}()
 
 	go func() {
 		defer wg.Done()
-		SecondDocumentText = getTextFromS3File(ctx, bucket, "document2.txt")
+		SecondDocumentText = getTextFromS3File(ctx, bucket, event.Document2Key)
 	}()
 
 	wg.Wait()
