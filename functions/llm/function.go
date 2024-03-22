@@ -162,8 +162,8 @@ func handler(ctx context.Context, event *LlmEvent) (string, error) {
 	prompt, _ := buildPrompt(firstDocumentText, SecondDocumentText)
 
 	completion, err := llms.GenerateFromSinglePrompt(ctx, llm, prompt,
-		llms.WithMaxTokens(30000),
-		llms.WithMaxLength(20000),
+		llms.WithMaxTokens(180000),
+		llms.WithMaxLength(50000),
 	)
 
 	if err != nil {
