@@ -68,7 +68,7 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
-    const completeNotificationQueue = new cdk.aws_sns.Topic(
+    const textractCompleteNotificationQueue = new cdk.aws_sns.Topic(
       this,
       "CompleteNotificationQueue",
       {
@@ -108,7 +108,7 @@ export class InfraStack extends cdk.Stack {
       },
     });
 
-    completeNotificationQueue.grantPublish(snsRole);
+    textractCompleteNotificationQueue.grantPublish(snsRole);
 
     const processDocumentsFunction = new cdk.aws_lambda.Function(
       this,
@@ -121,7 +121,7 @@ export class InfraStack extends cdk.Stack {
         environment: {
           UPLOAD_BUCKET: documentUploadBucket.bucketName,
           COMPLETE_BUCKET: processingCompleteBucket.bucketName,
-          SNS_TOPIC_ARN: completeNotificationQueue.topicArn,
+          SNS_TOPIC_ARN: textractCompleteNotificationQueue.topicArn,
           ROLE_ARN: snsRole.roleArn,
         },
         role: functionRole,
@@ -158,20 +158,6 @@ export class InfraStack extends cdk.Stack {
       role: bedrockLambdaRole,
       timeout: cdk.Duration.minutes(3),
     });
-    //   this,
-    //   "ExtractEnglishLanguage",
-    //   {
-    //     runtime: cdk.aws_lambda.Runtime.PROVIDED_AL2023,
-    //     architecture: cdk.aws_lambda.Architecture.ARM_64,
-    //     handler: "bootstrap",
-    //     code: cdk.aws_lambda.Code.fromAsset("../out/lambda/extract-english"),
-    //     environment: {
-    //       SOURCE_BUCKET: processingCompleteBucket.bucketName,
-    //       TARGET_BUCKET: extractedEnglishBucket.bucketName,
-    //     },
-    //     role: functionRole,
-    //   }
-    // );
 
     documentUploadBucket.grantRead(processDocumentsFunction);
     processingCompleteBucket.grantWrite(processDocumentsFunction);
